@@ -1,56 +1,105 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class Rocket : MonoBehaviour
 {
     [SerializeField] float mainThrust = 100f;
     [SerializeField] float rcsThrust = 100f;
+    [SerializeField] AudioClip mainEngine;
+    [SerializeField] AudioClip success;
+    [SerializeField] AudioClip crashed;
+
     Rigidbody rigidBody;
-    AudioSource rocketEngine;
+    AudioSource audioSource;
+
+    enum State { Alive, Dying, Transcending }
+    State state = State.Alive;
+
     // Start is called before the first frame update
     void Start()
     {
         rigidBody = GetComponent<Rigidbody>();
-        rocketEngine = GetComponent<AudioSource>();
+        audioSource = GetComponent<AudioSource>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        Thrust();
-        Rotate();
+        if (state == State.Alive) 
+        {
+            RespondToThrustInput();
+            RespondToRotateInput();
+        }
     }
 
     void OnCollisionEnter(Collision collision) 
     {
+
+        if (state != State.Alive) { return; } // to ignore collisions after the first
+
         switch (collision.gameObject.tag)
         {
             case "Friendly":
-                break;  // do nothing
-            case "Fuel":
+                break;
+            case "Finish":
+                StartSuccessSequence();
                 break;
             default:
-                break;  // todo - kill the player
-        }
-    }
-    private void Thrust()
-    {
-        if (Input.GetKey(KeyCode.Space))
-        {
-            rigidBody.AddRelativeForce(Vector3.up * mainThrust);
-            if (!rocketEngine.isPlaying)
-            {
-                rocketEngine.Play();
-            }
-        }
-        else
-        {
-            rocketEngine.Stop();
+                StartDeathSequence();
+                break;
         }
     }
 
-    private void Rotate()
+    private void StartSuccessSequence()
+    {
+        state = State.Transcending;
+        audioSource.Stop();
+        audioSource.PlayOneShot(success);
+        Invoke("LoadNextLevel", 1f); // parameterize the time
+    }
+
+    private void StartDeathSequence()
+    {
+        state = State.Dying;
+        audioSource.Stop();
+        audioSource.PlayOneShot(crashed);
+        Invoke("LoadFirstLevel", 2f);
+    }
+
+    private void LoadFirstLevel()
+    {
+        SceneManager.LoadScene(0);
+    }
+
+    private void LoadNextLevel()
+    {
+        SceneManager.LoadScene(1); // todo allow more than 2 levels
+    }
+
+    private void RespondToThrustInput()
+    {
+        if (Input.GetKey(KeyCode.Space))
+        {
+            ApplyThrust();
+        }
+        else
+        {
+            audioSource.Stop();
+        }
+    }
+
+    private void ApplyThrust()
+    {
+        rigidBody.AddRelativeForce(Vector3.up * mainThrust);
+        if (!audioSource.isPlaying)
+        {
+            audioSource.PlayOneShot(mainEngine);
+        }
+    }
+
+    private void RespondToRotateInput()
     {
         rigidBody.freezeRotation = true; // take manual control of the rotation
 
